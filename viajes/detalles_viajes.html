@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link href="../style.css" rel="stylesheet">
+    <title>Detalles del Viaje</title>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Gastos de Viaje</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="../viajes/listar_viajes.html">Mis Viajes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="../gastos/saldos.html">Saldos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="../login/login.html">Cerrar Sesión</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    <div class="container mt-5">
+        <h1 id="tripName"></h1>
+        <p><strong>Código del Viaje:</strong> <span id="tripCode"></span></p>
+        <p><strong>Divisa:</strong> <span id="tripCurrency"></span></p>
+        
+        <h5>Participantes:</h5>
+        <ul id="tripParticipants" class="list-group mb-3"></ul>
+        
+        <h5>Gastos:</h5>
+        <table class="table table-dark">
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Título</th>
+                    <th>Monto</th>
+                    <th>Pagador</th>
+                    <th>Detalles</th>
+                </tr>
+            </thead>
+            <tbody id="tripExpenses"></tbody>
+        </table>
+    
+        <h5>Total Gastado por Participante:</h5>
+        <ul id="totalSpentByParticipant" class="list-group mb-3"></ul>
+    
+        <h5>Total General de Gastos:</h5>
+        <p id="totalExpenses" class="font-weight-bold"></p>
+    
+        <button class="btn btn-primary" data-toggle="modal" data-target="#addExpenseModal">Añadir Gasto</button>
+    </div>
+    
+    <!-- Modal para añadir gasto -->
+    <div class="modal fade" id="addExpenseModal" tabindex="-1" role="dialog" aria-labelledby="addExpenseModalLabel" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addExpenseModalLabel">Registrar Gasto</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="expenseForm">
+                        <div class="form-group">
+                            <label for="expenseTitle">Título del Gasto</label>
+                            <input type="text" class="form-control" id="expenseTitle" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="expenseAmount">Monto Pagado</label>
+                            <input type="number" class="form-control" id="expenseAmount" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="expenseDate">Fecha del Gasto</label>
+                            <input type="date" class="form-control" id="expenseDate" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="expensePayer">Participante que realizó el pago</label>
+                            <select class="form-control" id="expensePayer" required></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="expenseParticipants">Participantes que dividirán el gasto</label>
+                            <select id="expenseParticipantsSelect" class="form-control" multiple required></select>
+                            <small class="form-text text-muted">Mantén presionada la tecla Ctrl (o Cmd en Mac) para seleccionar múltiples participantes.</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Registrar Gasto</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+    const selectedTripIndex = localStorage.getItem('selectedTripIndex');
+    
+    if (selectedTripIndex !== null) {
+        const trips = JSON.parse(localStorage.getItem('trips')) || [];
+        const trip = trips[selectedTripIndex];
+    
+        // Mostrar los detalles del viaje
+        document.getElementById('tripName').textContent = trip.name;
+        document.getElementById('tripCode').textContent = trip.code;
+        document.getElementById('tripCurrency').textContent = trip.currency;
+    
+        const participantsList = document.getElementById('tripParticipants');
+        trip.participants.forEach(participant => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.textContent = participant;
+            participantsList.appendChild(li);
+        });
+    
+        const expenseContainer = document.getElementById('tripExpenses');
+        trip.expenses = trip.expenses || []; 
+    
+        // Mostrar los gastos en la tabla
+        trip.expenses.forEach(expense => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+            <td>${new Date(expense.date).toLocaleDateString()}</td>
+            <td>${expense.title}</td>
+            <td>${expense.amount}</td>
+            <td>${expense.payer}</td>
+            <td><a href="../gastos/detalle_gasto.html?expense=${encodeURIComponent(JSON.stringify(expense))}" class="btn btn-info">Detalles</a></td>
+        `;
+        expenseContainer.appendChild(row);
+});
+    
+        // Calcular y mostrar total gastado por participante
+        const totalSpent = {};
+        trip.expenses.forEach(expense => {
+            if (!totalSpent[expense.payer]) {
+                totalSpent[expense.payer] = 0;
+            }
+            totalSpent[expense.payer] += expense.amount;
+        });
+    
+        const totalSpentList = document.getElementById('totalSpentByParticipant');
+        Object.keys(totalSpent).forEach(participant => {
+            const li = document.createElement('li');
+            li.className = 'list-group-item';
+            li.textContent = `${participant}: ${totalSpent[participant]}`;
+            totalSpentList.appendChild(li);
+        });
+    
+        // Mostrar total general de gastos
+        const totalGeneral = trip.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+        document.getElementById('totalExpenses').textContent = totalGeneral;
+    
+        // Llenar el select de pagador en el modal
+        const expensePayerSelect = document.getElementById('expensePayer');
+        trip.participants.forEach(participant => {
+            const optionPayer = document.createElement('option');
+            optionPayer.value = participant;
+            optionPayer.textContent = participant;
+            expensePayerSelect.appendChild(optionPayer);
+        });
+    
+        // Llenar el select de participantes en el modal, excluyendo al pagador
+        const expenseParticipantsSelect = document.getElementById('expenseParticipantsSelect');
+        expensePayerSelect.addEventListener('change', function() {
+            const selectedPayer = this.value;
+    
+            // Limpiar opciones del select de participantes
+            expenseParticipantsSelect.innerHTML = '';
+    
+            // Agregar participantes que no sean el pagador
+            trip.participants.forEach(participant => {
+                if (participant !== selectedPayer) {
+                    const optionParticipant = document.createElement('option');
+                    optionParticipant.value = participant;
+                    optionParticipant.textContent = participant;
+                    expenseParticipantsSelect.appendChild(optionParticipant);
+                }
+            });
+        });
+    
+        // Manejar el envío del formulario de gastos
+        document.getElementById('expenseForm').addEventListener('submit', function(event) {
+            event.preventDefault();
+    
+            const title = document.getElementById('expenseTitle').value;
+            const amount = parseFloat(document.getElementById('expenseAmount').value);
+            const date = document.getElementById('expenseDate').value; 
+            const payer = document.getElementById('expensePayer').value;
+            const selectedParticipants = Array.from(expenseParticipantsSelect.selectedOptions).map(option => option.value);
+            
+            // Guardar el nuevo gasto en el objeto del viaje
+            trip.expenses.push({ title, amount, date, payer, participants: selectedParticipants });
+            localStorage.setItem('trips', JSON.stringify(trips));
+    
+            // Actualizar la lista de gastos mostrada
+            const newRow = document.createElement('tr');
+            newRow.innerHTML = `
+                <td>${new Date(date).toLocaleDateString()}</td>
+                <td>${title}</td>
+                <td>${amount}</td>
+                <td>${payer}</td>
+                <td><a href="detalle_gasto.html?expense=${encodeURIComponent(JSON.stringify({ title, amount, date, payer, participants: selectedParticipants }))}" class="btn btn-info">Detalles</a></td>
+            `;
+            expenseContainer.appendChild(newRow);
+    
+            // Limpiar el formulario y cerrar el modal
+            document.getElementById('expenseForm').reset();
+            $('#addExpenseModal').modal('hide');
+    
+            // Volver a cargar los gastos para reflejar el nuevo gasto
+            location.reload();
+        });
+    }
+    </script>
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+</html>

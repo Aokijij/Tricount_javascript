@@ -1,0 +1,278 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Viajes - Administración de Gastos</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="../style.css" rel="stylesheet">
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Gastos de Viaje</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="../viajes/listar_viajes.html">Mis Viajes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="../gastos/saldos.html">Saldos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="../login/login.html">Cerrar Sesión</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5">
+        <h1>Mis Viajes</h1>
+        <ul id="tripsList" class="list-group"></ul>
+        <button class="btn btn-primary mt-3" data-toggle="modal" data-target="#addTripModal">Añadir Viaje</button>
+        <button class="btn btn-secondary mt-3" data-toggle="modal" data-target="#joinTripModal">Unirse a un Viaje</button>
+    </div>
+
+    <!-- Modal para añadir viaje -->
+    <div class="modal fade" id="addTripModal" tabindex="-1" role="dialog" aria-labelledby="addTripModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="addTripModalLabel">Añadir Viaje</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="createTripForm">
+                        <div class="form-group">
+                            <label for="tripName">Nombre del viaje</label>
+                            <input type="text" class="form-control" id="tripName" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="currency">Tipo de divisa</label>
+                            <select class="form-control" id="currency" required>
+                                <option value="COP">COP</option>
+                                <option value="USD">USD</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="participantEmail">Añadir Participantes</label>
+                            <input type="email" class="form-control" id="participantEmail" placeholder="Correo del participante">
+                            <button type="button" class="btn btn-primary mt-2" id="addParticipant">Añadir Participante</button>
+                        </div>
+                        <ul id="participantsList" class="list-group mb-3"></ul>
+                        <button type="submit" class="btn btn-success">Crear Viaje</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para unirse a un viaje -->
+    <div class="modal fade" id="joinTripModal" tabindex="-1" role="dialog" aria-labelledby="joinTripModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="joinTripModalLabel">Unirse a un Viaje</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="joinTripForm">
+                        <div class="form-group">
+                            <label for="tripCode">Código del Viaje</label>
+                            <input type="text" class="form-control" id="tripCode" required>
+                        </div>
+                        <button type="submit" class="btn btn-secondary">Unirse</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para mostrar detalles del viaje -->
+    <div class="modal fade" id="tripDetailsModal" tabindex="-1" role="dialog" aria-labelledby="tripDetailsModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="tripDetailsModalLabel">Detalles del Viaje</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <h6 id="tripDetailName"></h6>
+                    <p><strong>Código del Viaje:</strong> <span id="tripDetailCode"></span></p>
+                    <p><strong>Divisa:</strong> <span id="tripDetailCurrency"></span></p>
+                    <p><strong>Participantes:</strong></p>
+                    <ul id="tripDetailParticipants" class="list-group"></ul>
+                    <button id="viewMoreDetails" class="btn btn-secondary mt-3">Ver Más Detalles</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Función para generar un código único
+        function generateUniqueCode() {
+            return 'TRIP-' + Math.random().toString(36).substr(2, 9).toUpperCase();
+        }
+
+        // Función para renderizar los viajes desde LocalStorage
+        function renderTrips() {
+            const trips = JSON.parse(localStorage.getItem('trips')) || [];
+            const tripsList = document.getElementById('tripsList');
+            tripsList.innerHTML = '';
+
+            // Obtener el correo del usuario que ha iniciado sesión
+            const loggedInUserEmail = localStorage.getItem('loggedInUser');
+
+            // Filtrar los viajes donde el usuario está incluido
+            const userTrips = trips.filter(trip => trip.participants.includes(loggedInUserEmail));
+
+            userTrips.forEach((trip, index) => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item d-flex justify-content-between align-items-center';
+                li.textContent = trip.name;
+
+                const detailsBtn = document.createElement('button');
+                detailsBtn.className = 'btn btn-info btn-sm';
+                detailsBtn.textContent = 'Ver Detalles';
+                detailsBtn.onclick = function () {
+                    showTripDetails(index);
+                };
+
+                li.appendChild(detailsBtn);
+                tripsList.appendChild(li);
+            });
+        }
+
+        // Función para mostrar detalles del viaje
+        function showTripDetails(index) {
+            const trips = JSON.parse(localStorage.getItem('trips')) || [];
+            const trip = trips[index];
+
+            document.getElementById('tripDetailName').textContent = trip.name;
+            document.getElementById('tripDetailCode').textContent = trip.code; 
+            document.getElementById('tripDetailCurrency').textContent = trip.currency;
+
+            const participantsList = document.getElementById('tripDetailParticipants');
+            participantsList.innerHTML = '';
+
+            // Mostrar participantes del viaje
+            trip.participants.forEach(participant => {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = participant;
+                participantsList.appendChild(li);
+            });
+
+            // Obtener el correo del usuario que ha iniciado sesión
+            const loggedInUserEmail = localStorage.getItem('loggedInUser');
+            if (loggedInUserEmail && !trip.participants.includes(loggedInUserEmail)) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item text-success';
+                li.textContent = loggedInUserEmail + " (Usuario Actual)";
+                participantsList.appendChild(li); 
+            }
+
+            // Asignar el índice al botón de "Ver Más Detalles"
+            document.getElementById('viewMoreDetails').onclick = function () {
+                localStorage.setItem('selectedTripIndex', index);
+                window.location.href = '../viajes/detalles_viajes.html'; 
+            };
+
+            $('#tripDetailsModal').modal('show');
+        }
+
+        // Almacenar un nuevo viaje en LocalStorage
+        document.getElementById('createTripForm').onsubmit = function (event) {
+            event.preventDefault();
+            const tripName = document.getElementById('tripName').value;
+            const tripCurrency = document.getElementById('currency').value;
+            const participantEmail = localStorage.getItem('loggedInUser');
+            const tripCode = generateUniqueCode();
+
+            // Obtener participantes desde la lista
+            const participants = Array.from(document.querySelectorAll('#participantsList .list-group-item'))
+                .map(li => li.textContent); 
+            participants.push(participantEmail); 
+
+            const trip = {
+                name: tripName,
+                currency: tripCurrency,
+                code: tripCode,
+                participants: participants,
+            };
+
+            const trips = JSON.parse(localStorage.getItem('trips')) || [];
+            trips.push(trip);
+            localStorage.setItem('trips', JSON.stringify(trips));
+
+            $('#addTripModal').modal('hide');
+            renderTrips();
+            document.getElementById('createTripForm').reset();
+            document.getElementById('participantsList').innerHTML = '';
+        };
+
+        // Añadir un participante al viaje
+        document.getElementById('addParticipant').onclick = function () {
+            const participantEmail = document.getElementById('participantEmail').value;
+            if (participantEmail) {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = participantEmail;
+                document.getElementById('participantsList').appendChild(li);
+                document.getElementById('participantEmail').value = ''; 
+            } else {
+                alert("Por favor, ingresa un correo electrónico.");
+            }
+        };
+
+        // Unirse a un viaje
+        document.getElementById('joinTripForm').onsubmit = function (event) {
+            event.preventDefault();
+            const tripCode = document.getElementById('tripCode').value;
+            const trips = JSON.parse(localStorage.getItem('trips')) || [];
+            const trip = trips.find(trip => trip.code === tripCode);
+
+            if (trip) {
+                const loggedInUserEmail = localStorage.getItem('loggedInUser');
+                if (!trip.participants.includes(loggedInUserEmail)) {
+                    trip.participants.push(loggedInUserEmail);
+                    localStorage.setItem('trips', JSON.stringify(trips));
+                    alert("Te has unido al viaje exitosamente.");
+                    $('#joinTripModal').modal('hide');
+                    renderTrips();
+                } else {
+                    alert("Ya estás en este viaje.");
+                }
+            } else {
+                alert("Código de viaje inválido.");
+            }
+        };
+
+        // Inicializar la aplicación
+        window.onload = function () {
+            renderTrips();
+        };
+    </script>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.10.2/dist/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+</body>
+
+</html>

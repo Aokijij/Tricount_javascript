@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <link href="../style.css" rel="stylesheet">
+    <title>Saldos de Participantes</title>
+</head>
+
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">Gastos de Viaje</a>
+            <button class="navbar-toggler" type="button" data-toggle="collapse" data-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ml-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="../viajes/listar_viajes.html">Mis Viajes</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="../gastos/saldos.html">Saldos</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="../login/login.html">Cerrar Sesión</a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container mt-5">
+        <h1>Resumen de Saldos</h1>
+        <div class="form-group">
+            <label for="tripSelect">Seleccionar Viaje:</label>
+            <select id="tripSelect" class="form-control"></select>
+        </div>
+    
+        <p><strong>Viaje:</strong> <span id="tripName"></span></p>
+        <p><strong>Total Gastado:</strong> <span id="totalExpenses"></span></p>
+    
+        <h5>Saldos por Participante:</h5>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Participante</th>
+                    <th>Pagado</th>
+                    <th>Debe</th>
+                    <th>Saldo</th>
+                </tr>
+            </thead>
+            <tbody id="balanceTable"></tbody>
+        </table>
+    
+        <button class="btn btn-primary" id="equilibrarBtn">Equilibrar Gastos</button>
+    
+        <h5 class="mt-4">Transacciones para equilibrar los gastos:</h5>
+        <ul id="equilibrarList" class="list-group"></ul>
+    </div>
+    
+    <script>
+        // Obtener el email del usuario logueado
+        const userEmail = localStorage.getItem('loggedInUser');
+        
+        // Obtener los viajes almacenados en localStorage
+        const trips = JSON.parse(localStorage.getItem('trips')) || [];
+        
+        // Llenar el select con los viajes disponibles donde el usuario está incluido
+        const tripSelect = document.getElementById('tripSelect');
+        trips.forEach((trip, index) => {
+            if (trip.participants.includes(userEmail)) { 
+                const option = document.createElement('option');
+                option.value = index;
+                option.textContent = trip.name;
+                tripSelect.appendChild(option);
+            }
+        });
+        
+        // Función para calcular y mostrar los saldos
+        function mostrarSaldos(tripIndex) {
+            const trip = trips[tripIndex];
+    
+            if (trip) {
+                // Mostrar el nombre del viaje
+                document.getElementById('tripName').textContent = trip.name;
+    
+                const balanceTable = document.getElementById('balanceTable');
+                balanceTable.innerHTML = ''; 
+    
+                const totalSpentByParticipant = {};
+                const totalOwedByParticipant = {};
+    
+                // Inicializar los saldos de cada participante
+                trip.participants.forEach(participant => {
+                    totalSpentByParticipant[participant] = 0;
+                    totalOwedByParticipant[participant] = 0;
+                });
+    
+                // Calcular cuánto ha pagado cada participante
+                trip.expenses.forEach(expense => {
+                    totalSpentByParticipant[expense.payer] += expense.amount;
+    
+                    // Dividir el gasto entre los participantes involucrados en ese gasto
+                    const share = expense.amount / (expense.participants.length + 1); 
+    
+                    // Asignar el costo compartido a cada participante (incluido el pagador)
+                    expense.participants.forEach(participant => {
+                        totalOwedByParticipant[participant] += share;
+                    });
+                    // También contar al pagador en lo que debe haber pagado
+                    totalOwedByParticipant[expense.payer] += share;
+                });
+    
+                // Calcular el saldo de cada participante
+                trip.participants.forEach(participant => {
+                    const paid = totalSpentByParticipant[participant];
+                    const owed = totalOwedByParticipant[participant];
+                    const balance = paid - owed;
+    
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td>${participant}</td>
+                        <td>${paid.toFixed(2)}</td>
+                        <td>${owed.toFixed(2)}</td>
+                        <td>${balance.toFixed(2)}</td>
+                    `;
+                    balanceTable.appendChild(row);
+                });
+    
+                // Mostrar el total general de gastos
+                const totalExpenses = trip.expenses.reduce((sum, expense) => sum + expense.amount, 0);
+                document.getElementById('totalExpenses').textContent = totalExpenses.toFixed(2);
+    
+                // Manejar el equilibrio de gastos
+                document.getElementById('equilibrarBtn').onclick = function() {
+                    equilibrarSaldos(trip);
+                };
+            }
+        }
+    
+        // Función para equilibrar gastos
+        function equilibrarSaldos(trip) {
+            const transactions = [];
+            const participantsWithPositiveBalance = [];
+            const participantsWithNegativeBalance = [];
+    
+            // Calcular los saldos
+            const totalSpentByParticipant = {};
+            const totalOwedByParticipant = {};
+    
+            trip.participants.forEach(participant => {
+                totalSpentByParticipant[participant] = 0;
+                totalOwedByParticipant[participant] = 0;
+            });
+    
+            trip.expenses.forEach(expense => {
+                totalSpentByParticipant[expense.payer] += expense.amount;
+                const share = expense.amount / (expense.participants.length + 1);
+    
+                expense.participants.forEach(participant => {
+                    totalOwedByParticipant[participant] += share;
+                });
+                totalOwedByParticipant[expense.payer] += share;
+            });
+    
+            trip.participants.forEach(participant => {
+                const balance = totalSpentByParticipant[participant] - totalOwedByParticipant[participant];
+                if (balance > 0) {
+                    participantsWithPositiveBalance.push({ participant, balance });
+                } else if (balance < 0) {
+                    participantsWithNegativeBalance.push({ participant, balance: Math.abs(balance) });
+                }
+            });
+    
+            // Equilibrar los saldos
+            while (participantsWithPositiveBalance.length > 0 && participantsWithNegativeBalance.length > 0) {
+                const creditor = participantsWithPositiveBalance[0];
+                const debtor = participantsWithNegativeBalance[0];
+    
+                const amountToSettle = Math.min(creditor.balance, debtor.balance);
+    
+                transactions.push(`${debtor.participant} debe pagar $${amountToSettle.toFixed(2)} a ${creditor.participant}`);
+    
+                creditor.balance -= amountToSettle;
+                debtor.balance -= amountToSettle;
+    
+                if (creditor.balance === 0) {
+                    participantsWithPositiveBalance.shift(); 
+                }
+    
+                if (debtor.balance === 0) {
+                    participantsWithNegativeBalance.shift(); 
+                }
+            }
+    
+            // Mostrar las transacciones para equilibrar
+            const equilibrarList = document.getElementById('equilibrarList');
+            equilibrarList.innerHTML = ''; 
+    
+            if (transactions.length > 0) {
+                transactions.forEach(transaction => {
+                    const li = document.createElement('li');
+                    li.className = 'list-group-item';
+                    li.textContent = transaction;
+                    equilibrarList.appendChild(li);
+                });
+            } else {
+                const li = document.createElement('li');
+                li.className = 'list-group-item';
+                li.textContent = 'Todos los gastos ya están equilibrados.';
+                equilibrarList.appendChild(li);
+            }
+        }
+    
+        // Escuchar cambios en el select del viaje
+        tripSelect.addEventListener('change', function() {
+            const selectedTripIndex = this.value;
+            mostrarSaldos(selectedTripIndex);
+        });
+    
+        // Mostrar los saldos del primer viaje por defecto si hay viajes
+        if (tripSelect.options.length > 0) {
+            mostrarSaldos(0);
+        }
+        
+        document.addEventListener('DOMContentLoaded', function() {
+            if (userEmail) {
+                document.getElementById('userEmail').textContent = userEmail;
+            }
+        });
+    </script>
+</body>
+</html>
